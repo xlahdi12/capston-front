@@ -4,6 +4,9 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { Send, MessageCircle, Smile, Lightbulb, Settings2 } from "lucide-react"
+import axios from "axios"
+import api from "@/lib/api"
+import { useInView } from 'react-intersection-observer';
 
 interface Message {
   id: string
@@ -29,6 +32,9 @@ const chatbotModes = [
 ]
 
 export default function ChatPage() {
+  const [ref, inView] = useInView();
+  const [page, setPage] = useState(0);
+  const [last, setLast] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -38,6 +44,7 @@ export default function ChatPage() {
     },
   ])
   const [input, setInput] = useState("")
+  const [chatRoomId, setChatRoomId] = useState(null);
   const [isLoading, setIsLoading] = useState(false)
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([
     "오늘 하루를 말해줄래?",
@@ -56,58 +63,78 @@ export default function ChatPage() {
     scrollToBottom()
   }, [messages])
 
-  const detectEmotion = (text: string): string => {
-    const sadWords = ["슬프", "외로", "힘들", "피곤", "상처", "우울"]
-    const happyWords = ["행복", "기쁨", "즐거", "좋", "신나", "감사"]
-    const angryWords = ["화나", "짜증", "화다", "열받", "싫"]
-
-    const textLower = text.toLowerCase()
-    if (sadWords.some((word) => textLower.includes(word))) return "슬픈"
-    if (happyWords.some((word) => textLower.includes(word))) return "행복한"
-    if (angryWords.some((word) => textLower.includes(word))) return "화난"
-    return "중립적인"
-  }
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
 
-    const emotion = detectEmotion(input)
     const userMessage: Message = {
       id: Date.now().toString(),
       text: input,
       sender: "user",
-      timestamp: new Date(),
-      emotion,
+      timestamp: new Date()
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
+    const res = await api.post("http://localhost:8000/chat", { message: input, convId: chatRoomId });
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: res.data,
+      sender: "ai",
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, aiMessage])
+    setIsLoading(false)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "당신의 감정을 나누어주셔서 감사합니다. 그 상황이 정말 힘들었을 것 같네요. 더 자세히 이야기해 주실 수 있을까요?",
-        "그렇군요. 그런 감정을 느끼시는 것은 자연스러운 일입니다. 그 감정들과 더 자세히 대면해 볼까요?",
-        "좋은 일이 있었네요! 당신이 행복해하시는 모습을 상상하니 저도 함께 기쁩니다. 그 순간에 대해 더 말씀해 주시겠어요?",
-      ]
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: randomResponse,
-        sender: "ai",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMessage])
-      setIsLoading(false)
-    }, 1000)
   }
 
   const handleSuggestedTopic = (topic: string) => {
     setInput(topic)
   }
+  const getChatRoomData = async () => {
+    // const res = await api.post('http://localhost:8080/auth/conversations',{ai:"DEFAULT"});
+    const res2 = await api.get('http://localhost:8080/auth/conversations');
+    setChatRoomId(res2.data[0].id);
+  }
+  const getChatData = async () => {
+    if (!last) {
+      const res = await api.get(`http://localhost:8080/auth/messages?roomId=${chatRoomId}&page=${page}`)
+      setLast(res.data.last);
+      
+      res.data.content.map((d: any, i: number) => {
+        const aiMessage: Message = {
+          id: i.toString(),
+          text: d.content,
+          sender: d.role,
+          timestamp: new Date(
+            d.createdAt[0],
+            d.createdAt[1] - 1,
+            d.createdAt[2],
+            d.createdAt[3],
+            d.createdAt[4],
+            d.createdAt[5],
+            Math.floor(d.createdAt[6] / 1_000_000)
+          )
+        }
+        setMessages((prev) => [...prev, aiMessage]);
+      })
+      setPage(page + 1);
+    }
 
+  }
+  useEffect(() => {
+    getChatRoomData();
+  }, [])
+  useEffect(() => {
+    if (inView) {
+      console.log("inView 상태");
+      getChatData();
+    }
+  }, [inView])
+  useEffect(() => {
+    console.log("page :", page);
+  }, [page])
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/20">
       {/* Header */}
@@ -140,11 +167,10 @@ export default function ChatPage() {
                     setSelectedMode(mode.id)
                     setShowModeSelector(false)
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm mb-1 ${
-                    selectedMode === mode.id
-                      ? "bg-primary/20 text-primary font-medium"
-                      : "hover:bg-muted text-foreground"
-                  }`}
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm mb-1 ${selectedMode === mode.id
+                    ? "bg-primary/20 text-primary font-medium"
+                    : "hover:bg-muted text-foreground"
+                    }`}
                 >
                   <p className="font-medium">{mode.label}</p>
                   <p className="text-xs text-muted-foreground">{mode.description}</p>
@@ -183,21 +209,19 @@ export default function ChatPage() {
             </div>
           </div>
         )}
-
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
+        <div className="bg-black w-200 h-20" ref={ref}></div>
+        {messages.map((message, i) => (
+          <div key={i} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
-                message.sender === "user"
-                  ? "bg-primary text-primary-foreground rounded-br-none shadow-sm"
-                  : "bg-card border border-border text-foreground rounded-bl-none shadow-sm"
-              }`}
+              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${message.sender === "user"
+                ? "bg-primary text-primary-foreground rounded-br-none shadow-sm"
+                : "bg-card border border-border text-foreground rounded-bl-none shadow-sm"
+                }`}
             >
               <p className="text-sm leading-relaxed">{message.text}</p>
               <p
-                className={`text-xs mt-2 ${
-                  message.sender === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
-                }`}
+                className={`text-xs mt-2 ${message.sender === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                  }`}
               >
                 {message.timestamp.toLocaleTimeString("ko-KR", {
                   hour: "2-digit",

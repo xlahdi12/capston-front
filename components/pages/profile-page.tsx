@@ -54,7 +54,6 @@ export default function ProfilePage() {
   const getUserData = async () => {
     const res = await api.get(`/auth/user`);
     setProfile(res.data);
-    console.log(res.data);
 
   }
   useEffect(() => {
