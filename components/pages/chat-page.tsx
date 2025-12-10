@@ -95,6 +95,8 @@ export default function ChatPage() {
   const getChatRoomData = async () => {
     // const res = await api.post('http://localhost:8080/auth/conversations',{ai:"DEFAULT"});
     const res2 = await api.get('http://localhost:8080/auth/conversations');
+    console.log(res2);
+    
     setChatRoomId(res2.data[0].id);
   }
   const getChatData = async () => {
