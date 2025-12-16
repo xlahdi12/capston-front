@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Heart,
   MessageCircle,
@@ -16,6 +16,7 @@ import {
   Trash2,
   Send,
 } from "lucide-react"
+import api from "@/lib/api"
 
 interface Post {
   id: string
@@ -63,9 +64,7 @@ type CommentResponse = {
   createdAt: string
 }
 
-const API_BASE_URL = "http://localhost:8080/api"
-
-const emotionWeatherMap = {
+const emotionWeatherMap: Record<Post["emotion"], { icon: any; label: string; color: string }> = {
   sunny: { icon: Sun, label: "맑음", color: "text-yellow-500" },
   cloudy: { icon: Cloud, label: "흐림", color: "text-gray-400" },
   rainy: { icon: CloudRain, label: "비", color: "text-blue-500" },
@@ -74,39 +73,43 @@ const emotionWeatherMap = {
   drizzle: { icon: CloudDrizzle, label: "이슬비", color: "text-blue-400" },
 }
 
-const sortOptions = ["최신순", "인기순", "댓글순"]
+const sortOptions = ["최신순", "인기순", "댓글순"] as const
+type SortOption = (typeof sortOptions)[number]
 
 export default function CommunityPage() {
   const [posts, setPosts] = useState<Post[]>([])
-  const [sortBy, setSortBy] = useState("최신순")
+  const [sortBy, setSortBy] = useState<SortOption>("최신순")
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [showDetailView, setShowDetailView] = useState(false)
+
   const [commentText, setCommentText] = useState("")
   const [selectedComments, setSelectedComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingComments, setLoadingComments] = useState(false)
+  const [submittingComment, setSubmittingComment] = useState(false)
+  const [liking, setLiking] = useState(false)
 
-  const truncateText = (text: string, maxLength = 150) => {
-    if (text.length > maxLength) {
-      return text.substring(0, maxLength) + "..."
-    }
-    return text
-  }
+  const currentUserCode = useMemo(() => {
+    if (typeof window === "undefined") return 0
+    const raw = window.localStorage.getItem("userCode")
+    const n = raw ? Number(raw) : 0
+    return Number.isFinite(n) ? n : 0
+  }, [])
+
+  const truncateText = (text: string, maxLength = 150) => (text.length > maxLength ? text.substring(0, maxLength) + "..." : text)
 
   const formatDate = (value: string) => {
     const d = new Date(value)
     if (Number.isNaN(d.getTime())) return value
-    return d.toLocaleString("ko-KR", {
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+    return d.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
   }
 
   const mapForumToPost = (forum: ForumResponse): Post => {
-    const emotionKey =
-      (forum.emotionName as Post["emotion"]) || "sunny"
+    const rawEmotion = (forum.emotionName || "").toLowerCase()
+    const emotionKey: Post["emotion"] =
+      rawEmotion === "sunny" || rawEmotion === "cloudy" || rawEmotion === "rainy" || rawEmotion === "snowy" || rawEmotion === "windy" || rawEmotion === "drizzle"
+        ? (rawEmotion as Post["emotion"])
+        : "sunny"
 
     return {
       id: String(forum.id),
@@ -119,7 +122,7 @@ export default function CommunityPage() {
       likes: forum.likeCount ?? 0,
       comments: forum.commentCount ?? 0,
       tags: [],
-      isOwn: false,
+      isOwn: currentUserCode ? forum.userCode === currentUserCode : false,
     }
   }
 
@@ -130,25 +133,20 @@ export default function CommunityPage() {
       avatar: "👤",
       date: formatDate(comment.createdAt),
       content: comment.content,
-      isOwn: false,
+      isOwn: currentUserCode ? comment.userCode === currentUserCode : false,
     }
   }
 
-  const fetchPosts = async (sort?: string) => {
+  const fetchPosts = async (sortParam?: string) => {
     try {
       setLoading(true)
-      const url =
-        sort && sort !== "최신순"
-          ? `${API_BASE_URL}/board?sort=${encodeURIComponent(sort)}`
-          : `${API_BASE_URL}/board`
-
-      const res = await fetch(url)
-      if (!res.ok) throw new Error("failed to load forums")
-      const data: ForumResponse[] = await res.json()
-      const mapped = data.map(mapForumToPost)
-      setPosts(mapped)
+      const res = await api.get<ForumResponse[]>("/api/board", {
+        params: sortParam ? { sort: sortParam } : {},
+      })
+      setPosts(res.data.map(mapForumToPost))
     } catch (e) {
       console.error(e)
+      alert("게시글을 불러오지 못했습니다.")
     } finally {
       setLoading(false)
     }
@@ -157,56 +155,111 @@ export default function CommunityPage() {
   const fetchComments = async (postId: string) => {
     try {
       setLoadingComments(true)
-      const res = await fetch(`${API_BASE_URL}/board/${postId}/comments`)
-      if (!res.ok) throw new Error("failed to load comments")
-      const data: CommentResponse[] = await res.json()
-      const mapped = data.map(mapCommentToComment)
-      setSelectedComments(mapped)
+      const res = await api.get<CommentResponse[]>(`/api/board/${postId}/comments`)
+      setSelectedComments(res.data.map(mapCommentToComment))
     } catch (e) {
       console.error(e)
+      alert("댓글을 불러오지 못했습니다.")
     } finally {
       setLoadingComments(false)
     }
   }
 
+  const refreshSelectedPostCounts = async (postId: string) => {
+    try {
+      const res = await api.get<ForumResponse>(`/api/board/${postId}`)
+      const updated = mapForumToPost(res.data)
+
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes: updated.likes, comments: updated.comments } : p)))
+
+      if (selectedPostId === postId) {
+        // 상세 화면에서도 좋아요/댓글 수 즉시 반영
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   useEffect(() => {
     fetchPosts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (sortBy === "인기순") {
-      fetchPosts("likes")
-    } else if (sortBy === "댓글순") {
-      fetchPosts("comments")
-    } else {
-      fetchPosts()
-    }
+    if (sortBy === "인기순") fetchPosts("likes")
+    else if (sortBy === "댓글순") fetchPosts("comments")
+    else fetchPosts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy])
 
-  const handleLike = (postId: string) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId ? { ...post, likes: post.likes + 1 } : post,
-      ),
-    )
+  const openDetail = async (postId: string) => {
+    setSelectedPostId(postId)
+    setShowDetailView(true)
+    setCommentText("")
+    await fetchComments(postId)
+    await refreshSelectedPostCounts(postId)
+  }
+
+  const closeDetail = () => {
+    setShowDetailView(false)
+    setSelectedPostId(null)
+    setSelectedComments([])
+    setCommentText("")
   }
 
   const handleDeletePost = (postId: string) => {
     setPosts((prev) => prev.filter((post) => post.id !== postId))
-    setShowDetailView(false)
-    setSelectedPostId(null)
-    setSelectedComments([])
+    closeDetail()
   }
 
-  const selectedPost = selectedPostId ? posts.find((post) => post.id === selectedPostId) : null
-
-  const sortedPosts = [...posts]
-
-  if (sortBy === "인기순") {
-    sortedPosts.sort((a, b) => b.likes - a.likes)
-  } else if (sortBy === "댓글순") {
-    sortedPosts.sort((a, b) => b.comments - a.comments)
+  const handleLike = async (postId: string) => {
+    if (liking) return
+    try {
+      setLiking(true)
+      await api.post(`/api/board/${postId}/like`)
+      await refreshSelectedPostCounts(postId)
+      if (sortBy === "인기순") fetchPosts("likes")
+    } catch (e) {
+      console.error(e)
+      alert("좋아요 처리에 실패했습니다.")
+    } finally {
+      setLiking(false)
+    }
   }
+
+  const submitComment = async () => {
+    const forumId = selectedPostId
+    const content = commentText.trim()
+    if (!forumId) return
+    if (!content) return
+
+    try {
+      setSubmittingComment(true)
+      await api.post(`/api/board/${forumId}/comments`, {
+        content,
+        parentCommentId: null,
+      })
+
+      setCommentText("")
+      await fetchComments(forumId)
+      await refreshSelectedPostCounts(forumId)
+      if (sortBy === "댓글순") fetchPosts("comments")
+    } catch (e) {
+      console.error(e)
+      alert("댓글 작성에 실패했습니다.")
+    } finally {
+      setSubmittingComment(false)
+    }
+  }
+
+  const selectedPost = selectedPostId ? posts.find((p) => p.id === selectedPostId) : null
+
+  const localSortedPosts = useMemo(() => {
+    const arr = [...posts]
+    if (sortBy === "인기순") arr.sort((a, b) => b.likes - a.likes)
+    else if (sortBy === "댓글순") arr.sort((a, b) => b.comments - a.comments)
+    return arr
+  }, [posts, sortBy])
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -237,8 +290,9 @@ export default function CommunityPage() {
         <div className="flex-1 overflow-y-auto p-4">
           <div className="max-w-2xl mx-auto space-y-4">
             {loading && <div className="text-center text-sm text-muted-foreground py-4">불러오는 중...</div>}
+
             {!loading &&
-              sortedPosts.map((post) => {
+              localSortedPosts.map((post) => {
                 const WeatherIcon = emotionWeatherMap[post.emotion].icon
                 const weatherColor = emotionWeatherMap[post.emotion].color
                 const weatherLabel = emotionWeatherMap[post.emotion].label
@@ -247,11 +301,7 @@ export default function CommunityPage() {
                 return (
                   <div
                     key={post.id}
-                    onClick={() => {
-                      setSelectedPostId(post.id)
-                      setShowDetailView(true)
-                      fetchComments(post.id)
-                    }}
+                    onClick={() => openDetail(post.id)}
                     className="bg-card rounded-2xl border border-border hover:border-primary/50 transition-all shadow-sm overflow-hidden cursor-pointer"
                   >
                     <div className="p-4 border-b border-border">
@@ -292,16 +342,6 @@ export default function CommunityPage() {
                     <div className="p-4 space-y-3">
                       <h3 className="font-semibold text-foreground text-base leading-relaxed">{post.title}</h3>
                       <p className="text-sm text-foreground/80 leading-relaxed">{truncatedContent}</p>
-
-                      {post.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-2">
-                          {post.tags.map((tag) => (
-                            <span key={tag} className="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
                     <div className="px-4 py-3 border-t border-border bg-muted/30 flex items-center justify-between text-xs text-muted-foreground">
@@ -316,18 +356,14 @@ export default function CommunityPage() {
                           <Heart className="w-4 h-4" />
                           <span>{post.likes}</span>
                         </button>
-                        <button
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 hover:text-primary transition-colors"
-                        >
+
+                        <button onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 hover:text-primary transition-colors">
                           <MessageCircle className="w-4 h-4" />
                           <span>{post.comments}</span>
                         </button>
                       </div>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 hover:text-primary transition-colors"
-                      >
+
+                      <button onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 hover:text-primary transition-colors">
                         <Share2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -354,25 +390,12 @@ export default function CommunityPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm text-muted-foreground">감정 상태:</span>
-                        {emotionWeatherMap[selectedPost.emotion] && (
-                          <>
-                            <span className="text-sm text-muted-foreground">
-                              {emotionWeatherMap[selectedPost.emotion].label}
-                            </span>
-                          </>
-                        )}
+                        <span className="text-sm text-muted-foreground">{emotionWeatherMap[selectedPost.emotion].label}</span>
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setShowDetailView(false)
-                      setSelectedPostId(null)
-                      setSelectedComments([])
-                    }}
-                    className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0"
-                  >
+                  <button onClick={closeDetail} className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
@@ -382,16 +405,6 @@ export default function CommunityPage() {
                     <h2 className="text-2xl font-semibold text-foreground mb-3">{selectedPost.title}</h2>
                     <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">{selectedPost.content}</p>
                   </div>
-
-                  {selectedPost.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
-                      {selectedPost.tags.map((tag) => (
-                        <span key={tag} className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-sm font-medium">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
                 <div className="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
@@ -403,41 +416,29 @@ export default function CommunityPage() {
                       <Heart className="w-5 h-5" />
                       <span className="text-sm">{selectedPost.likes}</span>
                     </button>
+
                     <button className="flex items-center gap-2 hover:text-primary transition-colors text-muted-foreground">
                       <MessageCircle className="w-5 h-5" />
-                      <span className="text-sm">{selectedComments.length}</span>
+                      <span className="text-sm">{selectedPost.comments}</span>
                     </button>
                   </div>
+
                   <button className="flex items-center gap-2 hover:text-primary transition-colors text-muted-foreground">
                     <Share2 className="w-5 h-5" />
                   </button>
                 </div>
 
-                {selectedPost.isOwn && (
-                  <div className="px-6 py-3 border-t border-border flex gap-2 justify-end">
-                    <button className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors font-medium text-sm flex items-center gap-2">
-                      <Edit2 className="w-4 h-4" />
-                      수정하기
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleDeletePost(selectedPost.id)
-                      }}
-                      className="px-4 py-2 bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors font-medium text-sm flex items-center gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      삭제하기
-                    </button>
-                  </div>
-                )}
-
                 <div className="border-t border-border">
-                  {loadingComments && (
-                    <div className="p-6 text-sm text-muted-foreground">댓글 불러오는 중...</div>
-                  )}
-                  {!loadingComments && selectedComments.length > 0 && (
+                  {loadingComments && <div className="p-6 text-sm text-muted-foreground">댓글 불러오는 중...</div>}
+
+                  {!loadingComments && (
                     <div className="p-6 space-y-4 bg-muted/20">
                       <h3 className="font-semibold text-foreground mb-4">댓글 ({selectedComments.length})</h3>
+
+                      {selectedComments.length === 0 && (
+                        <div className="text-sm text-muted-foreground">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</div>
+                      )}
+
                       {selectedComments.map((comment) => (
                         <div key={comment.id} className="flex gap-3 pb-4 border-b border-border last:border-b-0">
                           <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
@@ -449,16 +450,6 @@ export default function CommunityPage() {
                               <span className="text-xs text-muted-foreground">{comment.date}</span>
                             </div>
                             <p className="text-sm text-foreground/80">{comment.content}</p>
-                            {comment.isOwn && (
-                              <div className="flex gap-2 mt-2">
-                                <button className="text-xs text-muted-foreground hover:text-primary transition-colors">
-                                  수정
-                                </button>
-                                <button className="text-xs text-muted-foreground hover:text-destructive transition-colors">
-                                  삭제
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </div>
                       ))}
@@ -472,9 +463,21 @@ export default function CommunityPage() {
                         placeholder="댓글을 작성해주세요..."
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            if (!submittingComment) submitComment()
+                          }
+                        }}
+                        disabled={submittingComment}
+                        className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-60"
                       />
-                      <button className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1">
+
+                      <button
+                        onClick={submitComment}
+                        disabled={submittingComment || !commentText.trim()}
+                        className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1 disabled:opacity-60"
+                      >
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
