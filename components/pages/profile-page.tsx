@@ -14,9 +14,14 @@ interface UserProfile {
   conversationCount: number
   monthCount: number
 }
-
+type Growth = {
+  stability: number
+  confidence: number
+  positivity: number
+}
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
+  const [growthData, setGrowthData] = useState<Growth | null>(null);
   const [profile, setProfile] = useState<UserProfile>({
     name: "로딩 중..",
     email: "",
@@ -54,10 +59,18 @@ export default function ProfilePage() {
   const getUserData = async () => {
     const res = await api.get(`/auth/user`);
     setProfile(res.data);
-
   }
-  useEffect(() => {
+  const getGrowthData = async() => {
+    console.log("getGrowthData ㄷㅡㄹㅇㅓㅇㅗㅁ");
+    
+    const res = await api.get(`/auth/growth`);
+    console.log('sfoksidgfndso',res.data);
+    
+    setGrowthData(res.data);
+  }
+  useEffect(() => {    
     getUserData();
+    getGrowthData();
   }, [])
 
   return (
@@ -207,30 +220,30 @@ export default function ProfilePage() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-foreground">감정 안정도</span>
-                    <span className="text-xs font-bold text-primary">72%</span>
+                    <span className="text-xs font-bold text-primary">{growthData?.stability}</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: "72%" }} />
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${growthData?.stability}%` }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-foreground">자신감</span>
-                    <span className="text-xs font-bold text-secondary">65%</span>
+                    <span className="text-xs font-bold text-secondary">{growthData?.confidence}</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-secondary rounded-full" style={{ width: "65%" }} />
+                    <div className="h-full bg-secondary rounded-full" style={{ width: `${growthData?.confidence}%` }} />
                   </div>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-foreground">긍정성</span>
-                    <span className="text-xs font-bold text-accent">58%</span>
+                    <span className="text-xs font-bold text-accent">{growthData?.positivity}</span>
                   </div>
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-accent rounded-full" style={{ width: "58%" }} />
+                    <div className="h-full bg-accent rounded-full" style={{ width: `${growthData?.positivity}%` }} />
                   </div>
                 </div>
               </div>

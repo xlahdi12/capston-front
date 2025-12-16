@@ -4,6 +4,12 @@ import { useEffect, useState } from "react"
 import { Sun, Cloud, CloudRain, CloudSnow, Wind, CloudDrizzle, ChevronLeft, ChevronRight, X, TrendingUp, Share2, Wand2, } from "lucide-react"
 import api from "@/lib/api"
 
+interface EmotionChange {
+    count:number
+    topEmotion:string
+    volatility:string
+}
+
 interface EmotionEntry {
   analysisCode: number | undefined
   emotionScore: number
@@ -12,6 +18,8 @@ interface EmotionEntry {
   createAt: number[]
   userCode: number
 }
+
+
 const emotionWeatherMap = {
   sunny: { icon: Sun, label: "맑음", color: "text-yellow-500" },  // 5
   cloudy: { icon: Cloud, label: "흐림", color: "text-gray-400" }, // 4
@@ -26,6 +34,7 @@ export default function EmotionCalendar() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [generatedDiary, setGeneratedDiary] = useState<string | null>(null)
   const [serverData, setServerData] = useState<EmotionEntry[]>([]);
+  const [emotionChange, setEmotionChange] = useState<EmotionChange | null>(null);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -54,15 +63,24 @@ export default function EmotionCalendar() {
     setGeneratedDiary(generatedText)
   }
   const getCalendarData = async () => {
-    console.log(currentDate);
+    // console.log(currentDate);
     
-    const res = await api.get(`http://localhost:8080/auth/calendar?year=${currentDate.getFullYear()}&month=${currentDate.getMonth()+1}`)
-    console.log(res.data);
+    const res = await api.get(`/auth/calendar?year=${currentDate.getFullYear()}&month=${currentDate.getMonth()+1}`)
+    // console.log(res.data);
     setServerData(res.data);
+  }
+  const getEmotionChange = async() => {
+    const res = await api.get(`/auth/emotion?year=${currentDate.getFullYear()}&month=${currentDate.getMonth()+1}`)
+    setEmotionChange(res.data);    
+    console.log(res.data);
+    
   }
   useEffect(()=>{
     getCalendarData();
   },[])
+  useEffect(() => {
+    getEmotionChange();    
+  },[currentDate])
 
   const daysInMonth = getDaysInMonth(currentDate)
   const firstDay = getFirstDayOfMonth(currentDate)
@@ -180,21 +198,19 @@ export default function EmotionCalendar() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm text-foreground">이번 달 기록 횟수</span>
-                  <span className="font-semibold text-primary">{serverData.length}회</span>
+                  <span className="font-semibold text-primary">{emotionChange?.count}회</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm text-foreground">가장 많은 감정</span>
-                  <span className="font-semibold text-primary">맑음</span>
+                  <span className="font-semibold text-primary">{emotionChange?.topEmotion !== '-' ? emotionChange?.topEmotion : '없음'}</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <span className="text-sm text-foreground">감정 변동성</span>
-                  <span className="font-semibold text-primary">중간</span>
+                  <span className="font-semibold text-primary">{emotionChange?.volatility!=='-'?emotionChange?.volatility:'없음'}</span>
                 </div>
               </div>
 
-              <button className="w-full mt-4 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors text-sm font-medium">
-                상세 리포트 보기
-              </button>
+              
             </div>
 
             {/* Selected Entry */}

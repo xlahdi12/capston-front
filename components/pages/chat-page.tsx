@@ -90,8 +90,8 @@ export default function ChatPage() {
 
   const getChatRoomData = async () => {
     if(!isLoggedIn) return;
-    await api.post("http://localhost:8080/auth/conversations", { ai: "DEFAULT" })
-    const res2 = await api.get("http://localhost:8080/auth/conversations")
+    await api.post("/auth/conversations", { ai: "DEFAULT" })
+    const res2 = await api.get("/auth/conversations")
     setChatRoomId(res2.data[0].id)
   }
 
@@ -112,7 +112,7 @@ export default function ChatPage() {
 
     setIsFetchingPage(true)
     try {
-      const res = await api.get(`http://localhost:8080/auth/messages?roomId=${chatRoomId}&page=${page}`)
+      const res = await api.get(`/auth/messages?roomId=${chatRoomId}&page=${page}`)
       setLast(res.data.last)
       const newMessages: Message[] = res.data.content
         .slice()

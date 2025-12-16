@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Play, Music, Leaf, Heart } from "lucide-react"
-
+import YouTube from 'react-youtube';
 interface Content {
   id: string
   title: string
@@ -11,6 +11,8 @@ interface Content {
   description: string
   level: "beginner" | "intermediate" | "advanced"
   color: string
+  thumbnail: string
+  url: string
   gradient: string
 }
 
@@ -24,6 +26,8 @@ const meditationContents: Content[] = [
     level: "beginner",
     color: "from-blue-400 to-blue-600",
     gradient: "bg-gradient-to-br from-blue-400/20 to-blue-600/20",
+    thumbnail: 'https://img.youtube.com/vi/dZewQEbQQM0/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=dZewQEbQQM0',
   },
   {
     id: "2",
@@ -34,6 +38,8 @@ const meditationContents: Content[] = [
     level: "intermediate",
     color: "from-purple-400 to-purple-600",
     gradient: "bg-gradient-to-br from-purple-400/20 to-purple-600/20",
+    thumbnail: 'https://img.youtube.com/vi/IAoXsc0OOvI/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?si=UJDt3FSo22mf4_WU&v=IAoXsc0OOvI&feature=youtu.be',
   },
   {
     id: "3",
@@ -44,6 +50,8 @@ const meditationContents: Content[] = [
     level: "beginner",
     color: "from-indigo-400 to-indigo-600",
     gradient: "bg-gradient-to-br from-indigo-400/20 to-indigo-600/20",
+    thumbnail: 'https://img.youtube.com/vi/PIoK5ZdYk6E/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?si=uMItXitKDCmhNWSk&v=PIoK5ZdYk6E&feature=youtu.be',
   },
   {
     id: "4",
@@ -54,6 +62,8 @@ const meditationContents: Content[] = [
     level: "intermediate",
     color: "from-rose-400 to-rose-600",
     gradient: "bg-gradient-to-br from-rose-400/20 to-rose-600/20",
+    thumbnail: 'https://img.youtube.com/vi/MmWwXbUM9uY/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=MmWwXbUM9uY',
   },
   {
     id: "5",
@@ -64,6 +74,8 @@ const meditationContents: Content[] = [
     level: "advanced",
     color: "from-teal-400 to-teal-600",
     gradient: "bg-gradient-to-br from-teal-400/20 to-teal-600/20",
+    thumbnail: 'https://img.youtube.com/vi/inxAScz0PTM/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?si=9pyVVqUo-sa6KOGa&v=inxAScz0PTM&feature=youtu.be',
   },
   {
     id: "6",
@@ -74,6 +86,8 @@ const meditationContents: Content[] = [
     level: "beginner",
     color: "from-amber-400 to-amber-600",
     gradient: "bg-gradient-to-br from-amber-400/20 to-amber-600/20",
+    thumbnail: 'https://img.youtube.com/vi/yiysD0Jl2Wo/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=yiysD0Jl2Wo',
   },
 ]
 
@@ -87,6 +101,8 @@ const musicContents: Content[] = [
     level: "beginner",
     color: "from-green-400 to-green-600",
     gradient: "bg-gradient-to-br from-green-400/20 to-green-600/20",
+    thumbnail: 'https://img.youtube.com/vi/nEUTBCLNoeQ/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=nEUTBCLNoeQ',
   },
   {
     id: "m2",
@@ -97,6 +113,8 @@ const musicContents: Content[] = [
     level: "beginner",
     color: "from-emerald-400 to-emerald-600",
     gradient: "bg-gradient-to-br from-emerald-400/20 to-emerald-600/20",
+    thumbnail: 'https://img.youtube.com/vi/CSjmEAeyQao/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=CSjmEAeyQao&list=RDCSjmEAeyQao&start_radio=1',
   },
   {
     id: "m3",
@@ -107,6 +125,8 @@ const musicContents: Content[] = [
     level: "intermediate",
     color: "from-orange-400 to-orange-600",
     gradient: "bg-gradient-to-br from-orange-400/20 to-orange-600/20",
+    thumbnail: 'https://img.youtube.com/vi/pywxuQJk3vc/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=pywxuQJk3vc',
   },
   {
     id: "m4",
@@ -117,6 +137,8 @@ const musicContents: Content[] = [
     level: "intermediate",
     color: "from-slate-400 to-slate-600",
     gradient: "bg-gradient-to-br from-slate-400/20 to-slate-600/20",
+    thumbnail: 'https://img.youtube.com/vi/npqwKtWqNds/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=npqwKtWqNds&list=RDnpqwKtWqNds&start_radio=1',
   },
   {
     id: "m5",
@@ -127,6 +149,8 @@ const musicContents: Content[] = [
     level: "advanced",
     color: "from-cyan-400 to-cyan-600",
     gradient: "bg-gradient-to-br from-cyan-400/20 to-cyan-600/20",
+    thumbnail: 'https://img.youtube.com/vi/feQn-0ObCAM/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=feQn-0ObCAM&list=RDfeQn-0ObCAM&start_radio=1',
   },
   {
     id: "m6",
@@ -137,6 +161,8 @@ const musicContents: Content[] = [
     level: "beginner",
     color: "from-pink-400 to-pink-600",
     gradient: "bg-gradient-to-br from-pink-400/20 to-pink-600/20",
+    thumbnail: 'https://img.youtube.com/vi/VE-0WIe7rog/mqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=VE-0WIe7rog&list=RDVE-0WIe7rog&start_radio=1',
   },
 ]
 
@@ -158,17 +184,16 @@ export default function MindCareContent() {
         <h2 className="font-semibold text-foreground text-lg">마음 관리</h2>
         <p className="text-xs text-muted-foreground mt-1">명상과 음악으로 마음을 돌보세요</p>
       </div>
-
+      {/* <img width={50} src={"https://img.youtube.com/vi/vXvsSSD7yzE/0.jpg"} alt="any"/> */}
       {/* Category Tabs */}
       <div className="border-b border-border bg-card px-4 pt-4">
         <div className="flex gap-4">
           <button
             onClick={() => setSelectedCategory("meditation")}
-            className={`pb-3 px-1 font-medium text-sm transition-all ${
-              selectedCategory === "meditation"
+            className={`pb-3 px-1 font-medium text-sm transition-all ${selectedCategory === "meditation"
                 ? "text-primary border-b-2 border-primary"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2">
               <Leaf className="w-4 h-4" />
@@ -177,11 +202,10 @@ export default function MindCareContent() {
           </button>
           <button
             onClick={() => setSelectedCategory("music")}
-            className={`pb-3 px-1 font-medium text-sm transition-all ${
-              selectedCategory === "music"
+            className={`pb-3 px-1 font-medium text-sm transition-all ${selectedCategory === "music"
                 ? "text-primary border-b-2 border-primary"
                 : "text-muted-foreground hover:text-foreground"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2">
               <Music className="w-4 h-4" />
@@ -198,13 +222,12 @@ export default function MindCareContent() {
             <div
               key={content.id}
               className={`${content.gradient} border border-primary/20 rounded-2xl overflow-hidden hover:shadow-lg transition-all group cursor-pointer`}
+              onClick={() => window.open(content.url)}
             >
               {/* Thumbnail */}
-              <div className="relative h-40 bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center group-hover:from-primary/40 group-hover:to-secondary/40 transition-all">
-                <button className="p-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all group-hover:scale-110 shadow-lg">
-                  <Play className="w-6 h-6 fill-current" />
-                </button>
-              </div>
+              {/* <div className="relative h-40 bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center group-hover:from-primary/40 group-hover:to-secondary/40 transition-all"> */}
+                <img className="rounded-2xl scale-80" style={{ height: '100%' }} src={content.thumbnail} />
+              {/* </div> */}
 
               {/* Content Info */}
               <div className="p-5">
